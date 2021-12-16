@@ -1,0 +1,259 @@
+'''
+selection of options (most common queries)
+custom options for advanced queries
+output switch name and option selected
+output to TXT Table
+hostname-, management ip-, vlans-, trunk ports-, WAN Port-
+'''
+import tkinter as tk
+from tkinter import *
+from tkinter import filedialog
+import ctypes
+import getpass
+
+import os
+import sys
+import fnmatch
+from prettytable import PrettyTable
+from time import sleep
+
+def chooseFolder():
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askdirectory()
+    return file_path
+    
+def switchSelection(selection):
+    
+    print("Make a selection of the type of switches to query\n")
+    
+    print("[1]: SECTOR")
+    print("[2]: STATION")
+    print("[3]: RFF")
+    print("[d]: EXIT SELECTION")
+    print()
+    
+    while True:
+    
+        userSelection = input("Enter Selection: ")
+        
+        if userSelection == 'd':
+            break
+        elif int(userSelection) > 3 or int(userSelection) < 0:
+           print("Invalid input, please select a number corresponding to the following options")
+        else:
+            SwitchSelectList.append(int(userSelection))
+        if len(SwitchSelectList) >= 3:
+            break
+            
+    return(selection)
+
+def advancedConfigSelection(switchTypeString, AdvancedList):
+    ## Needs to be changed to include items from basic query
+    print()
+    print(f"Select query items for {switchTypeString}: \n")
+    print(AdvancedItemTable.get_string())
+    
+    while True:
+    
+        userSelection = input('Enter Selection: ')
+        
+        if userSelection == 'd':
+            break
+        elif int(userSelection) > 13 or int(userSelection) < 0:
+            print('Invalid input, please select a number corresponding to a query option')
+        else:
+            AdvancedList.append(int(userSelection))
+        if len(AdvancedList) >= 13:
+            break
+    
+    return (AdvancedList)
+    
+    
+def queryTool(List, Dict):
+
+    for filenames in List:
+        
+        with open(filenames, 'r') as ReadFile:
+            Read_Text = ReadFile.readlines()
+            
+            for i, line in enumerate(Read_Text):
+            
+                if 'hostname' in line:
+                    hostName = Read_Text[i].replace('hostname', '').strip()
+                    Dict[hostName] = {'VLANs': [], 'Trunk Ports': [], 'Management IP': None, 'WAN Port': 'N/A',}         
+                    
+                if 'switchport mode trunk' in line:
+                    
+                    while 'interface' not in Read_Text[i]:
+                        
+                        i = i - 1
+                        
+                    Dict[hostName]['Trunk Ports'].append(Read_Text[i].replace('interface GigabitEthernet', 'Gi').strip())
+               
+                if 'WAN' in line:
+                    Dict[hostName]['WAN Port'] = Read_Text[i-1].replace('interface GigabitEthernet', 'Gi').rstrip()
+                
+                if re.search('^vlan ', line):
+                    Dict[hostName]['VLANs'].append(Read_Text[i].replace('vlan', '').strip())
+                    
+                    for items in Dict[hostName]['VLANs']:
+                        
+                        if 'internal allocation' in items:
+                            Dict[hostName]['VLANs'].pop(Dict[hostName]['VLANs'].index(items))
+                            
+                if re.search('^ ip address *', line):
+                    
+                    if ' 2' in Read_Text[i][11:26]:
+                        Dict[hostName]['Management IP'] = Read_Text[i][11:25]
+                    else:
+                        Dict[hostName]['Management IP'] = Read_Text[i][11:26]
+    return(Dict)
+    
+outputFile = os.path.abspath('C:/users/' + getpass.getuser() + '/desktop/SwitchConfigInventory.txt')
+
+origStdOut = sys.stdout
+
+SwitchSelectList = []
+QueryType = None
+
+QueryBasic = False
+QueryAdvanced = False
+
+SecSelected = False
+StaSelected = False
+RffSelected = False
+
+queryDict = {"1": "Basic Query", "2": "Advanced Query"}
+selectDict = {"1": "Sector Switches", "2": "Station Switches", "3": "RFF Switches"}
+
+AdvancedQueryOptions = {'1': 'Enabled VLAN Interfaces', '2': 'Enabled Port Description', '3': 'Interface BPDUGuard', '4': 'Interface Port Security Stats', '5': 'Interface UPS Ports', '6': 'Interface Spanning-Tree;', '7': 'Logging Size', '8': 'Logging Trap Level', '9': 'Management IP', '10': 'QoS', '11': 'Trunk Ports', '12': 'VLANs', '13': 'WAN Port'} 
+
+secAdvancedList = []
+staAdvancedList = []
+rffAdvancedList = []
+
+AdvancedItemTable = PrettyTable()
+AdvancedItemTable.field_names = ['Number', 'Configuration Query']
+
+
+for items in AdvancedQueryOptions:
+    AdvancedItemTable.add_row([items, AdvancedQueryOptions[items]])
+
+secDict = {}
+staDict = {}
+rffDict = {}
+
+SecTable = PrettyTable()
+SecTable.field_names = ["Switch Name", "VLANs", "Trunk Ports", "WAN Port", "Management IP"] 
+
+StaTable = PrettyTable()
+StaTable.field_names = ["Switch Name", "VLANs", "Trunk Ports", "WAN Port", "Management IP"]
+
+RffTable = PrettyTable()
+RffTable.field_names = ["Switch Name", "VLANs", "Trunk Ports", "WAN Port", "Management IP"]
+
+MessageBox = ctypes.windll.user32.MessageBoxW
+MessageBox(None, "Please select the root folder containing subfolders/files to analyze", "Select Root Folder", 0)
+
+rootFolder = os.path.abspath(chooseFolder())
+exportFolder = os.path.abspath('c:/users/' + getpass.getuser() + '/desktop/SwitchConfigInventory.csv')
+
+print("Select the type of query to run: ")
+print("[1]: Basic Query")
+print("[2]: Advanced Query")
+print()
+
+while True:
+    
+    QueryType = input("Enter Selection: ")
+    
+    if QueryType == '1':
+        QueryBasic = True
+        break
+    elif QueryType == '2':
+        QueryAdvanced = True
+        break
+    else:
+        print("Invalid Input, please enter values 1 or 2")
+        continue
+        
+if QueryBasic == True:
+
+    switchSelection(SwitchSelectList)
+
+    SwitchSelectSet = set(SwitchSelectList)
+    
+    print("Query will be made for: \n",)
+    for items in SwitchSelectSet:
+        print('-' + selectDict[str(items)])
+    print()
+    
+    print("Query was output to: " + outputFile)
+    print()
+    
+    for items in SwitchSelectSet:
+        if items == 1:
+            SecSelected = True
+            SecList = []
+        if items == 2:
+            StaSelected = True
+            StaList = []
+        if items == 3:
+            RffSelected = True
+            RffList = []
+        
+    sys.stdout = open(outputFile, 'w')
+    
+    if SecSelected == True:
+
+        for subdir, dirs, files in os.walk(rootFolder):
+        
+            for file in files:
+            
+                if fnmatch.fnmatch(file, '*SEC*') or fnmatch.fnmatch(file, '*CCC*'):
+                    SecList.append(os.path.join(subdir, file))
+                
+        queryTool(SecList, secDict)
+
+        print('#' * 83+ 'SECTOR' + '#' * 77)                    
+        for items in secDict:
+            SecTable.add_row([items, secDict[items]['VLANs'], secDict[items]['Trunk Ports'], secDict[items]['WAN Port'], secDict[items]['Management IP']])
+        print(SecTable.get_string())
+        print()
+        
+    if StaSelected == True:
+
+        for subdir, dirs, files in os.walk(rootFolder):
+        
+            for file in files:
+            
+                if fnmatch.fnmatch(file, '*STA*'):
+                    StaList.append(os.path.join(subdir, file))
+                
+        queryTool(StaList, staDict)
+
+        print('#' * 48 + 'STATION' + '#' * 41)                    
+        for items in staDict:
+            StaTable.add_row([items, staDict[items]['VLANs'], staDict[items]['Trunk Ports'], staDict[items]['WAN Port'], staDict[items]['Management IP']])
+        print(StaTable.get_string())
+        print()
+        
+    if RffSelected == True:
+
+        for subdir, dirs, files in os.walk(rootFolder):
+    
+            for file in files:
+        
+                if fnmatch.fnmatch(file, '*RFF*'):
+                    RffList.append(os.path.join(subdir, file))
+                
+        queryTool(RffList, rffDict)
+        
+        print('#' * 50 + 'RFF' + '#' * 43)                    
+        for items in rffDict:
+            RffTable.add_row([items, rffDict[items]['VLANs'], rffDict[items]['Trunk Ports'], rffDict[items]['WAN Port'], rffDict[items]['Management IP']])
+        print(RffTable.get_string())
+    
+    sys.stdout.close()
+    sys.stdout = origStdOut
