@@ -211,7 +211,7 @@ if QueryBasic == True:
         
             for file in files:
             
-                if fnmatch.fnmatch(file, '*SEC*') or fnmatch.fnmatch(file, '*CCC*'):
+                if fnmatch.fnmatch(file, '*SEC*') or fnmatch.fnmatch(file, '*insert-value*'):
                     SecList.append(os.path.join(subdir, file))
                 
         queryTool(SecList, secDict)
